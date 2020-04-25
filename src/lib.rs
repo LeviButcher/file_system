@@ -1,4 +1,3 @@
-mod disk_emulator;
+mod Disk;
 mod file_system;
-mod shell;
-mod utils;
+mod line_handler;
