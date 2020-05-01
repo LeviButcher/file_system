@@ -1,1 +1,1 @@
-cargo-watch --ignore test-files/* -x test
+cargo-watch --ignore "test-files/*" -x test

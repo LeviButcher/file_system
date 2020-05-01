@@ -71,6 +71,12 @@ pub fn map2<'a, A: 'a, B: 'a, C: 'a>(
     })
 }
 
+pub fn flatten_option<'a, A: 'a>(
+    d: DiskAction<'a, Option<Option<A>>>,
+) -> DiskAction<'a, Option<A>> {
+    map(d, Box::new(|x| x.flatten()))
+}
+
 pub fn sequence<'a, A: 'a>(a: Vec<DiskAction<'a, A>>) -> DiskAction<'a, Vec<A>>
 where
     A: Clone,

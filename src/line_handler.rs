@@ -9,25 +9,28 @@ pub fn read<'a>(line: u32) -> DiskAction<'a, Option<String>> {
         let d = disk.read();
         let r = File::open(disk.file)
             .ok()
-            .and_then(|mut x: File| x.read_to_string(&mut v).ok().map(move |_| v))
+            .and_then(|mut x: File| {
+                let res = x.read_to_string(&mut v).ok().map(move |_| v);
+                x.flush();
+                res
+            })
             .and_then(move |l: String| l.lines().map(|x| x.to_owned()).nth(index_line as usize));
         (r, d)
     })
 }
 // Line [1..]
-pub fn write<'a>(line: u32, data: &'a str) -> DiskAction<'a, Option<String>> {
+pub fn write<'a>(line: u32, data: String) -> DiskAction<'a, Option<String>> {
     let indexed_line = line - 1;
 
     Box::new(move |disk: Disk| {
+        let data = data.clone();
         let mut file_data = String::new();
         let r = File::open(disk.file)
             .ok()
-            .and_then(|mut x: File| {
-                x.read_to_string(&mut file_data)
-                    .ok()
-                    .map(move |_| file_data)
-            })
-            .map(move |s: String| {
+            .and_then(Box::new(|mut x: File| {
+                x.read_to_string(&mut file_data).ok().map(|_| file_data)
+            }))
+            .map(Box::new(move |s: String| {
                 let r: Vec<String> = s.lines().map(|x| x.to_owned()).collect();
 
                 let extra_lines_to_add = if line > r.len() as u32 {
@@ -43,23 +46,27 @@ pub fn write<'a>(line: u32, data: &'a str) -> DiskAction<'a, Option<String>> {
                 r.into_iter()
                     .chain(extra_lines.into_iter())
                     .enumerate()
-                    .map(move |(i, v)| {
+                    .map(Box::new(move |(i, v)| {
                         if i as u32 == indexed_line {
-                            return data.to_owned();
+                            return data.clone();
                         }
                         v
-                    })
+                    }))
                     .collect()
-            })
-            .and_then(|x: Vec<String>| {
+            }))
+            .and_then(Box::new(|x: Vec<String>| {
                 let file_string: String = x.join("\n");
                 std::fs::OpenOptions::new()
                     .write(true)
                     .open(disk.file)
                     .ok()
-                    .and_then(|mut f: File| f.write_all(file_string.as_bytes()).ok())
+                    .and_then(|mut f: File| {
+                        let res = f.write_all(file_string.as_bytes()).ok();
+                        f.flush();
+                        res
+                    })
                     .and_then(move |_| x.get(indexed_line as usize).map(|x| x.to_owned()))
-            });
+            }));
         (r, disk.write())
     })
 }
@@ -115,7 +122,7 @@ mod tests {
     fn write_should_return_expected() {
         let expected_data = Some("super_awesome".into());
         let disk = Disk::new("./test-files/line_handler_test_file.txt");
-        let (data, updated_disk) = write(5, "super_awesome")(disk);
+        let (data, updated_disk) = write(5, "super_awesome".into())(disk);
         assert_eq!(data, expected_data);
         assert_eq!(updated_disk.writes, 1);
         assert_eq!(updated_disk.reads, 0);
@@ -128,7 +135,7 @@ mod tests {
     #[test]
     fn write_line_exists_should_return_expected() {
         let disk = Disk::new("./test-files/line_handler_test_file.txt");
-        let (_, updated_disk) = write(1, "Yeah")(disk);
+        let (_, updated_disk) = write(1, "Yeah".into())(disk);
         assert_eq!(updated_disk.writes, 1);
     }
 }
