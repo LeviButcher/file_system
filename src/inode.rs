@@ -33,11 +33,7 @@ impl Inode {
 
         map(d, file_system::lift(Box::new(&Inode::blocks_to_inodes)))
     }
-    // Get the superblock
-    // Read the Blocks that take up the inode table
-    // Convert each Block data into a array of Inodes
-    // flatten array of inodes
-    // get the inode with the number passed in
+
     pub fn get_inode<'a>(s: u32) -> DiskAction<'a, Option<Inode>> {
         let d = Inode::get_inode_table();
         let d = map(
@@ -81,6 +77,34 @@ impl Inode {
                 None => acc,
             })
     }
+
+    // Given a Inode, return all link list of blocks
+    fn get_inode_blocks<'a>(i: Inode) -> DiskAction<'a, Option<Vec<Block>>> {
+        // This could be improved with unfold, :/
+        // Or maybe map2?
+        Box::new(move |mut disk| {
+            let r = i.start_block;
+            let r = r.map(|start| Block::get_block(start));
+            let blocks = r.map(|read_block| {
+                let mut blocks = Vec::<Block>::new();
+                let (data, mut disk2) = read_block(disk);
+                data.map(|mut x| {
+                    blocks.push(x.clone());
+                    while x.clone().b_type != BlockType::End {
+                        if let BlockType::Next(num) = x.clone().b_type {
+                            let (data, disk3) = Block::get_block(num)(disk2);
+                            disk2 = disk3;
+                            x = data.unwrap();
+                            blocks.push(x.clone());
+                        }
+                    }
+                });
+                disk = disk2;
+                blocks
+            });
+            (blocks, disk)
+        })
+    }
 }
 
 #[cfg(test)]
@@ -109,5 +133,40 @@ mod tests {
         let disk = Disk::new("./file-system/sda1");
         let (data, _) = Inode::get_free_inode()(disk);
         assert_eq!(data, Some(expected_data));
+    }
+
+    #[test]
+    fn get_inode_blocks_should_return_expected() {
+        let expected_data = vec![
+            Block {
+                number: 4,
+                b_type: BlockType::Next(6),
+                data: "Somebody".into(),
+            },
+            Block {
+                number: 6,
+                b_type: BlockType::Next(8),
+                data: "Once".into(),
+            },
+            Block {
+                number: 8,
+                b_type: BlockType::Next(9),
+                data: "Told".into(),
+            },
+            Block {
+                number: 9,
+                b_type: BlockType::End,
+                data: "Me".into(),
+            },
+        ];
+        println!("{}", serde_json::to_string(&expected_data).unwrap());
+        let disk = Disk::new("./file-system/sda1");
+        let inode = Inode {
+            number: 3,
+            start_block: Some(4),
+        };
+        let (data, disk) = Inode::get_inode_blocks(inode)(disk);
+        assert_eq!(data, Some(expected_data));
+        assert_eq!(disk.reads, 4);
     }
 }

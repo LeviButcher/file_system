@@ -59,8 +59,9 @@ mod tests {
             b_type: BlockType::End,
         };
         let disk = Disk::new("./file-system/sda1");
-        let (data, _) = Block::get_block(1)(disk);
+        let (data, disk) = Block::get_block(1)(disk);
         assert_eq!(data, Some(expected_block));
+        assert_eq!(disk.reads, 1);
     }
 
     #[test]
