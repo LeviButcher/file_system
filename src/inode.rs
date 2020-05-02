@@ -355,7 +355,7 @@ mod tests {
                 start_block: None,
             },
         ];
-        let disk = Disk::new("./test-files/sda1_write");
+        let disk = Disk::new("./test-files/inode_replace_all_test");
         let (data, _) = Inode::replace_all_inodes(inodes.clone())(disk);
 
         assert_eq!(data, Some(inodes));
@@ -367,7 +367,7 @@ mod tests {
             number: 3,
             start_block: Some(42),
         };
-        let disk = Disk::new("./test-files/sda1_write");
+        let disk = Disk::new("./test-files/inode_write_test");
         let (data, _) = Inode::write_inode(inode)(disk);
 
         assert_eq!(data, Some(inode));

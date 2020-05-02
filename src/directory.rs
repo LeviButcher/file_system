@@ -40,15 +40,8 @@ impl Directory {
         inode_number: u32,
         file_name: String,
     ) -> DiskAction<'a, Option<u32>> {
-        // Read Directory
-        // Add new key value pair of i and file_name to directory
-        // Convert the Directory into a string
-        // Chunk up string into max amount vec string array
-        // Now the complex part :/
-        // Option 1
-        // Free up all blocks dictionary is currently on
-        // then get the amount of free blocks needed for vec string
-        // Write it out
+        println!("START SAVE DIRECTORY inode:{}", inode_number);
+
         let d = Directory::get_directory();
         let d = map(
             d,
@@ -58,16 +51,23 @@ impl Directory {
             })),
         );
         let wipe = Directory::wipe_directory_blocks();
-        let d = map2(d, wipe, Box::new(|a, b| a));
-        let d = map(d, utils::lift(Box::new(Directory::save_directory)));
+        let d = map2(d, wipe, Box::new(|a, _| a));
+
+        let d = flat_map(
+            d,
+            utils::lift_disk_action(Box::new(Directory::save_directory)),
+        );
         map(d, utils::lift(Box::new(move |_| inode_number)))
     }
 
     pub fn save_directory<'a>(d: Directory) -> DiskAction<'a, Option<Directory>> {
-        let ds = serde_json::to_string(&d).ok().unwrap_or("".into());
+        let ds = serde_json::to_string(&d)
+            .ok()
+            .expect("Directory failed to to_string");
         // Make sure to point inode 1 to first data block
         let blocks_data = utils::string_to_block_data_chunks(ds);
         let inode_1 = inode::Inode::get_inode(1);
+
         let blocks = Block::get_free_data_blocks(blocks_data.len());
         let blocks = map(
             blocks,
@@ -118,5 +118,18 @@ mod tests {
 
         let (directory, _) = Directory::get_directory()(disk);
         assert_eq!(directory, expected);
+    }
+
+    #[test]
+    fn save_file_should_return_expected() {
+        use std::fs;
+        let file_data = fs::read_to_string("./test-files/sda1").unwrap_or("".into());
+        fs::write("./test-files/directory_save_test", file_data).unwrap();
+        let disk = Disk::new("./test-files/directory_save_test");
+        let file_name: String = "plz_work.md".into();
+        let (data, disk) = Directory::write_file_name(5, file_name.clone())(disk);
+        assert_eq!(data, Some(5));
+        let (data, _) = Directory::get_directory()(disk);
+        assert!(data.unwrap().directory.contains_key(&file_name));
     }
 }

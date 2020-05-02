@@ -17,7 +17,13 @@ pub fn write_inode_and_blocks<'a>(
     let write_inode = Inode::write_inode(i);
     let write_blocks = blocks.into_iter().map(|b| Block::write_block(b)).collect();
     let write_blocks = sequence(write_blocks);
-    let write_blocks = map(write_blocks, Box::new(|w| utils::remove_options(w)));
+    let write_blocks = map(
+        write_blocks,
+        Box::new(|w| {
+            println!("{:?}", w);
+            utils::remove_options(w)
+        }),
+    );
 
     map2(
         write_inode,
@@ -97,26 +103,19 @@ mod tests {
 
     #[test]
     fn write_file_should_return_expected() {
-        use std::fs::File;
-        use std::io::Read;
-        use std::io::Write;
+        use std::fs;
 
-        let mut f = File::open("./test-files/sda1").unwrap();
-        let mut file_data = String::new();
-        f.read_to_string(&mut file_data);
-        f.flush();
-
-        let mut f = std::fs::OpenOptions::new()
-            .write(true)
-            .open("./test-files/sda1_write_file_test")
-            .unwrap();
-
-        f.write(file_data.as_bytes()).unwrap();
-        f.flush();
+        let file_data = fs::read_to_string("./test-files/sda1").unwrap_or("".into());
+        fs::write("./test-files/sda1_write_file_test", file_data).unwrap();
 
         let disk = Disk::new("./test-files/sda1_write_file_test");
         let file_data: String = "Ten long years have I waited for the day that COBOL will come back to rise from the bits".into();
-        let (result, _) = FileSystem::save_as_file("cobol_rise.txt".into(), file_data)(disk);
+
+        let (result, disk) =
+            FileSystem::save_as_file("cobol_rise.txt".into(), file_data.clone())(disk);
         assert_eq!(result, Some(2));
+
+        let (data, _) = FileSystem::read_file("cobol_rise.txt".into())(disk);
+        assert_eq!(data, Some(file_data));
     }
 }

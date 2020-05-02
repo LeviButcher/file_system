@@ -49,12 +49,13 @@ impl Block {
         // Filter for only Free Blocks
         // Take the amount of num
         // Return
+
         let d = SuperBlock::get_super_block();
+
         let d = map(d, utils::lift(Box::new(|x| x.get_storage_block_range())));
         let d = flat_map(
             d,
             utils::lift_disk_action(Box::new(|storage_range| {
-                println!("{:?}", storage_range);
                 let reads = storage_range
                     .into_iter()
                     .map(|x| Block::get_block(x))
@@ -66,9 +67,10 @@ impl Block {
         let d = map(d, Box::new(|x| x.unwrap_or(vec![])));
         map(
             d,
-            Box::new(|x| {
+            Box::new(move |x| {
                 x.into_iter()
                     .filter(|a| a.b_type == BlockType::Free)
+                    .take(num)
                     .collect()
             }),
         )
@@ -158,7 +160,7 @@ mod tests {
 
     #[test]
     fn get_free_data_blocks_should_return_amount_expected_and_be_free() {
-        let expected_count = 3;
+        let expected_count = 2;
         let disk = Disk::new("./test-files/sda1");
         let (data, _) = Block::get_free_data_blocks(expected_count)(disk);
         assert_eq!(data.len(), expected_count);

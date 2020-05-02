@@ -1,19 +1,12 @@
 use crate::disk::*;
-use std::fs::File;
-use std::io::{Read, Write};
+use std::fs;
 
 pub fn read<'a>(line: u32) -> DiskAction<'a, Option<String>> {
     let index_line = line - 1;
     Box::new(move |disk: Disk| {
-        let mut v: String = "".into();
         let d = disk.read();
-        let r = File::open(disk.file)
+        let r = fs::read_to_string(disk.file)
             .ok()
-            .and_then(|mut x: File| {
-                let res = x.read_to_string(&mut v).ok().map(move |_| v);
-                x.flush();
-                res
-            })
             .and_then(move |l: String| l.lines().map(|x| x.to_owned()).nth(index_line as usize));
         (r, d)
     })
@@ -24,12 +17,9 @@ pub fn write<'a>(line: u32, data: String) -> DiskAction<'a, Option<String>> {
 
     Box::new(move |disk: Disk| {
         let data = data.clone();
-        let mut file_data = String::new();
-        let r = File::open(disk.file)
+
+        let r = fs::read_to_string(disk.file)
             .ok()
-            .and_then(Box::new(|mut x: File| {
-                x.read_to_string(&mut file_data).ok().map(|_| file_data)
-            }))
             .map(Box::new(move |s: String| {
                 let r: Vec<String> = s.lines().map(|x| x.to_owned()).collect();
 
@@ -56,15 +46,9 @@ pub fn write<'a>(line: u32, data: String) -> DiskAction<'a, Option<String>> {
             }))
             .and_then(Box::new(|x: Vec<String>| {
                 let file_string: String = x.join("\n");
-                std::fs::OpenOptions::new()
-                    .write(true)
-                    .open(disk.file)
+
+                fs::write(disk.file, file_string)
                     .ok()
-                    .and_then(|mut f: File| {
-                        let res = f.write_all(file_string.as_bytes()).ok();
-                        f.flush();
-                        res
-                    })
                     .and_then(move |_| x.get(indexed_line as usize).map(|x| x.to_owned()))
             }));
         (r, disk.write())
@@ -134,7 +118,7 @@ mod tests {
 
     #[test]
     fn write_line_exists_should_return_expected() {
-        let disk = Disk::new("./test-files/line_handler_test_file.txt");
+        let disk = Disk::new("./test-files/line_handler_write_test.txt");
         let (_, updated_disk) = write(1, "Yeah".into())(disk);
         assert_eq!(updated_disk.writes, 1);
     }
