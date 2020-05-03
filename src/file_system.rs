@@ -6,11 +6,19 @@
 // Create a new Disk
 // Format a Disk
 
-use crate::block::*;
-use crate::directory::*;
-use crate::disk::*;
-use crate::inode::*;
-use crate::utils;
+mod block;
+mod diagnostics;
+mod directory;
+mod disk;
+mod inode;
+mod line_handler;
+mod utils;
+
+use block::*;
+use diagnostics::*;
+use directory::*;
+use disk::*;
+use inode::*;
 
 pub fn write_inode_and_blocks<'a>(
     a: (Inode, Vec<Block>),
@@ -159,12 +167,15 @@ impl FileSystem {
             }
         })
     }
+
+    pub fn get_diagnostic<'a>() -> DiskAction<'a, Option<DiskDiagnostics>> {
+        DiskDiagnostics::get_diagnostics()
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::disk::Disk;
 
     #[test]
     fn read_file_should_return_expected() {

@@ -1,6 +1,7 @@
-use crate::block::*;
-use crate::disk::*;
-use crate::utils;
+use super::block::*;
+use super::diagnostics::*;
+use super::disk::*;
+use super::utils;
 use serde::{Deserialize, Serialize};
 
 static INODE_TABLE_SIZE: u32 = 5;
@@ -25,6 +26,15 @@ impl Inode {
                 start_block: None,
             })
             .collect()
+    }
+
+    pub fn get_free_inodes<'a>() -> DiskAction<'a, Vec<Inode>> {
+        let d = Inode::get_inode_table();
+        let d = map(d, Box::new(|x| x.unwrap_or(vec![])));
+        map(
+            d,
+            Box::new(|x| x.into_iter().filter(|x| x.start_block == None).collect()),
+        )
     }
 
     fn get_inode_table<'a>() -> DiskAction<'a, Option<Vec<Inode>>> {

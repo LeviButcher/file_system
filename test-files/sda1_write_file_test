@@ -2,7 +2,7 @@
 {"number":2,"b_type":"End","data":"[{\"number\":1,\"start_block\":5},{\"number\":2,\"start_block\":3},{\"number\":3,\"start_block\":4}]"}
 {"number":3,"b_type":{"Next":7},"data":"Ten long years have I waited for the day that COBO"}
 {"number":4,"b_type":{"Next":6},"data":"Somebody"}
-{"number":5,"b_type":"End","data":"{\"directory\":{\"secret.txt\":3,\"cobol_rise.txt\":2}}"}
+{"number":5,"b_type":"End","data":"{\"directory\":{\"cobol_rise.txt\":2,\"secret.txt\":3}}"}
 {"number":6,"b_type":{"Next":8},"data":"Once"}
 {"number":7,"b_type":"End","data":"L will come back to rise from the bits"}
 {"number":8,"b_type":{"Next":9},"data":"Told"}
