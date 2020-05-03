@@ -1,4 +1,4 @@
-use crate::disk::*;
+use super::disk::*;
 use std::fs;
 
 pub fn read<'a>(line: u32) -> DiskAction<'a, Option<String>> {

@@ -1,7 +1,7 @@
-use crate::block::*;
-use crate::diagnostics::*;
-use crate::disk::*;
-use crate::utils;
+use super::block::*;
+use super::diagnostics::*;
+use super::disk::*;
+use super::utils;
 use serde::{Deserialize, Serialize};
 
 static INODE_TABLE_SIZE: u32 = 5;

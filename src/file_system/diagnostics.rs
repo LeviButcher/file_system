@@ -1,6 +1,6 @@
-use crate::block::*;
-use crate::disk::*;
-use crate::inode::*;
+use super::block::*;
+use super::disk::*;
+use super::inode::*;
 
 #[derive(Copy, PartialEq, Clone, Debug)]
 pub struct DiskDiagnostics {

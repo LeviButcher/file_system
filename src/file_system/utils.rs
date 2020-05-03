@@ -1,4 +1,4 @@
-use crate::disk::*;
+use super::disk::*;
 
 static MAX_DATA_SIZE: u32 = 50;
 
