@@ -1,4 +1,5 @@
 use crate::block::*;
+use crate::diagnostics::*;
 use crate::disk::*;
 use crate::utils;
 use serde::{Deserialize, Serialize};
@@ -25,6 +26,15 @@ impl Inode {
                 start_block: None,
             })
             .collect()
+    }
+
+    pub fn get_free_inodes<'a>() -> DiskAction<'a, Vec<Inode>> {
+        let d = Inode::get_inode_table();
+        let d = map(d, Box::new(|x| x.unwrap_or(vec![])));
+        map(
+            d,
+            Box::new(|x| x.into_iter().filter(|x| x.start_block == None).collect()),
+        )
     }
 
     fn get_inode_table<'a>() -> DiskAction<'a, Option<Vec<Inode>>> {
@@ -232,6 +242,10 @@ impl Inode {
     pub fn free_inode<'a>(mut i: Inode) -> DiskAction<'a, Option<Inode>> {
         i.start_block = None;
         Inode::write_inode(i)
+    }
+
+    pub fn get_diagnostic<'a>() -> DiskAction<'a, Option<DiskDiagnostics>> {
+        DiskDiagnostics::get_diagnostics()
     }
 }
 

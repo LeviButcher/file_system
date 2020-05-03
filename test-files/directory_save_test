@@ -1,6 +1,6 @@
 {"number":1,"b_type":"End","data":"{\"magic_number\":\"0x70736575646F4653\",\"total_blocks\":10}"}
 {"number":2,"b_type":"End","data":"[{\"number\":1,\"start_block\":3},{\"number\":2,\"start_block\":null},{\"number\":3,\"start_block\":4}]"}
-{"number":3,"b_type":"End","data":"{\"directory\":{\"plz_work.md\":5,\"secret.txt\":3}}"}
+{"number":3,"b_type":"End","data":"{\"directory\":{\"secret.txt\":3,\"plz_work.md\":5}}"}
 {"number":4,"b_type":{"Next":6},"data":"Somebody"}
 {"number":5,"b_type":"Free","data":""}
 {"number":6,"b_type":{"Next":8},"data":"Once"}

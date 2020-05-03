@@ -45,13 +45,7 @@ impl Block {
         a.into_iter().fold("".into(), |acc, curr| acc + &curr.data)
     }
 
-    pub fn get_free_data_blocks<'a>(num: usize) -> DiskAction<'a, Vec<Block>> {
-        // Read SuperBlock and Get Block Range
-        // Read all blocks
-        // Filter for only Free Blocks
-        // Take the amount of num
-        // Return
-
+    pub fn get_all_blocks<'a>() -> DiskAction<'a, Vec<Block>> {
         let d = SuperBlock::get_super_block();
 
         let d = map(d, utils::lift(Box::new(|x| x.get_storage_block_range())));
@@ -66,16 +60,24 @@ impl Block {
             })),
         );
         let d = map(d, utils::lift(Box::new(utils::remove_options)));
-        let d = map(d, Box::new(|x| x.unwrap_or(vec![])));
+        map(d, Box::new(|x| x.unwrap_or(vec![])))
+    }
+
+    pub fn get_all_free_data_blocks<'a>() -> DiskAction<'a, Vec<Block>> {
+        let d = Block::get_all_blocks();
         map(
             d,
             Box::new(move |x| {
                 x.into_iter()
                     .filter(|a| a.b_type == BlockType::Free)
-                    .take(num)
                     .collect()
             }),
         )
+    }
+
+    pub fn get_free_data_blocks<'a>(num: usize) -> DiskAction<'a, Vec<Block>> {
+        let d = Block::get_all_free_data_blocks();
+        map(d, Box::new(move |x| x.into_iter().take(num).collect()))
     }
 
     pub fn set_data_blocks_data(d: (Vec<Block>, Vec<String>)) -> Vec<Block> {
@@ -132,6 +134,11 @@ impl SuperBlock {
     pub fn get_storage_block_range(&self) -> std::ops::Range<u32> {
         let inodes_end = (self.total_blocks as f32 * 0.10) as u32 + 2;
         (inodes_end..self.total_blocks + 1)
+    }
+
+    pub fn get_inode_count(&self) -> u32 {
+        let inode_table_blocks = (self.total_blocks as f32 * 0.10) as u32;
+        inode_table_blocks * self.total_blocks
     }
 
     pub fn new(size: u32) -> SuperBlock {
