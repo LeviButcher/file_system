@@ -3,6 +3,8 @@ use crate::line_handler;
 use crate::utils;
 use serde::{Deserialize, Serialize};
 
+static MAGIC_NUMBER: &str = "0x70736575646F4653";
+
 #[derive(Clone, Serialize, Deserialize, Debug, PartialEq)]
 pub struct Block {
     pub number: u32,
@@ -115,6 +117,13 @@ impl SuperBlock {
     pub fn get_storage_block_range(&self) -> std::ops::Range<u32> {
         let inodes_end = (self.total_blocks as f32 * 0.10) as u32 + 2;
         (inodes_end..self.total_blocks + 1)
+    }
+
+    pub fn new(size: u32) -> SuperBlock {
+        SuperBlock {
+            magic_number: MAGIC_NUMBER.to_owned(),
+            total_blocks: size,
+        }
     }
 }
 

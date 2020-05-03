@@ -3,6 +3,8 @@
 // Save A new file
 // Delete a File
 // Print Diagnostics -> Disk Responsibility
+// Create a new Disk
+// Format a Disk
 
 use crate::block::*;
 use crate::directory::*;
@@ -34,15 +36,7 @@ pub fn write_inode_and_blocks<'a>(
 
 struct FileSystem {}
 impl FileSystem {
-    /// Given a Disk we will
-    /// 1. Read Inode 1
-    /// 2. Construct Data of Inode 1
-    /// 3. Get Data Blocks of Inode
-    /// 4. Parse that into a Directory
-    /// 5. Search the Directory map for key of file_name
-    /// 6. If found, take associated inode number and construct Inode Data
-    /// 7. Return Inode Data
-    fn read_file<'a>(file_name: String) -> DiskAction<'a, Option<String>> {
+    pub fn read_file<'a>(file_name: String) -> DiskAction<'a, Option<String>> {
         let d = Directory::get_directory();
         let d = map(
             d,
@@ -59,16 +53,7 @@ impl FileSystem {
         map(d, utils::lift(Box::new(Block::blocks_to_data)))
     }
 
-    /// Give a disk we will
-    /// 1. Chunk data into 1024 char array
-    /// 1. Get Free Inode
-    /// 2. Get Amount of Free Blocks as char array
-    /// 3. Set Free Inodes startBlock to first block in char array and follow through the blocks till end
-    /// 4. Write Free Inode and Start Blocks to disk
-    /// 5. Write File Name and Inode Number to directory
-    ///
-    /// Return back inode number
-    fn save_as_file<'a>(file_name: String, data: String) -> DiskAction<'a, Option<u32>> {
+    pub fn save_as_file<'a>(file_name: String, data: String) -> DiskAction<'a, Option<u32>> {
         let data = utils::string_to_block_data_chunks(data);
         let d = Inode::get_free_inode(); // Get A Free Inode
         let data_block = Block::get_free_data_blocks(data.len()); // Get Enough Free Blocks for data
@@ -86,6 +71,72 @@ impl FileSystem {
                 None => unit(None),
             }),
         ) // Write out the file name to the directory
+    }
+
+    // ls the directory
+    pub fn get_directory<'a>() -> DiskAction<'a, Option<Directory>> {
+        Directory::get_directory()
+    }
+
+    // Size == how many line
+    pub fn create_disk<'a>(file: String, size: u32) -> bool {
+        use std::fs;
+
+        fs::File::create(file.clone())
+            .ok()
+            .map(move |_| FileSystem::format(file, size))
+            .unwrap_or(false)
+    }
+
+    pub fn remove_file<'a>(file_name: String) -> DiskAction<'a, bool> {
+        unit(false)
+    }
+
+    // Format the given disk
+    // write blocks to file
+    // write Superblock
+    // write inodes
+    // write directory
+    pub fn format<'a>(file_name: String, size: u32) -> bool {
+        let disk = Disk::new(&file_name);
+        let super_block = SuperBlock::new(size);
+        let write_blocks: Vec<DiskAction<Option<Block>>> = (1..size + 1)
+            .into_iter()
+            .map(|x| {
+                if x == 1 {
+                    return Block {
+                        number: x,
+                        b_type: BlockType::Free,
+                        data: serde_json::to_string(&super_block).unwrap_or("".into()),
+                    };
+                } else {
+                    Block {
+                        number: x,
+                        b_type: BlockType::Free,
+                        data: "".into(),
+                    }
+                }
+            })
+            .map(Block::write_block)
+            .collect();
+
+        let write_blocks = sequence(write_blocks);
+
+        let inodes = Inode::generate_inodes(size);
+        let write_inodes = Inode::replace_all_inodes(inodes);
+
+        let directory = Directory::default();
+        let write_directory = Directory::save_directory(directory);
+
+        let d = map2(write_blocks, write_inodes, Box::new(|a, _| a));
+        let d = map2(d, write_directory, Box::new(|_, b| b));
+        let (res, _d) = d(disk);
+        res.is_some()
+    }
+
+    // Check that superblock is valid, if so return disk
+    pub fn mount<'a>(file_name: String) -> Option<Disk<'a>> {
+        None
     }
 }
 
@@ -117,5 +168,27 @@ mod tests {
 
         let (data, _) = FileSystem::read_file("cobol_rise.txt".into())(disk);
         assert_eq!(data, Some(file_data));
+    }
+
+    #[test]
+    fn format_should_return_expected() {
+        let file: String = "./test-files/format_test".into();
+        let blocks = 50;
+        let res = FileSystem::format(file.clone(), blocks);
+        assert!(res);
+        let disk = Disk::new(&file);
+        let (sb, _) = SuperBlock::get_super_block()(disk);
+        assert_eq!(sb.unwrap().total_blocks, blocks);
+    }
+
+    #[test]
+    fn create_disk_should_return_expected() {
+        let file: String = "./test-files/create_test".into();
+        let blocks = 50;
+        let res = FileSystem::create_disk(file.clone(), blocks);
+        assert!(res);
+        let disk = Disk::new(&file);
+        let (sb, _) = SuperBlock::get_super_block()(disk);
+        assert_eq!(sb.unwrap().total_blocks, blocks);
     }
 }

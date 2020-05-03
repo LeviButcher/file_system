@@ -15,6 +15,18 @@ pub struct Inode {
 // Inode table spans across two blocks
 // Inode table blocks take up 10% of available blocks
 impl Inode {
+    pub fn generate_inodes(size: u32) -> Vec<Inode> {
+        let inode_table_blocks = (size as f32 * 0.10) as u32;
+        let total_inodes = inode_table_blocks * size;
+        (1..total_inodes + 1)
+            .into_iter()
+            .map(|x| Inode {
+                number: x,
+                start_block: None,
+            })
+            .collect()
+    }
+
     fn get_inode_table<'a>() -> DiskAction<'a, Option<Vec<Inode>>> {
         let d = SuperBlock::get_super_block();
         let d = flat_map(

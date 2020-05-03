@@ -16,6 +16,13 @@ impl Directory {
         self.directory.get(s).map(|x| *x)
     }
 
+    pub fn default() -> Directory {
+        let mut h = HashMap::new();
+        h.insert(".".into(), 1);
+        h.insert("/".into(), 1);
+        Directory { directory: h }
+    }
+
     // Read the superblock, if no magic number then none
     // Read First Inode
     // Construct data Blocks
