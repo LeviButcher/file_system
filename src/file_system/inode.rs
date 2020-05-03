@@ -243,10 +243,6 @@ impl Inode {
         i.start_block = None;
         Inode::write_inode(i)
     }
-
-    pub fn get_diagnostic<'a>() -> DiskAction<'a, Option<DiskDiagnostics>> {
-        DiskDiagnostics::get_diagnostics()
-    }
 }
 
 #[cfg(test)]

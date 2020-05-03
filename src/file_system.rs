@@ -15,6 +15,7 @@ mod line_handler;
 mod utils;
 
 use block::*;
+use diagnostics::*;
 use directory::*;
 use disk::*;
 use inode::*;
@@ -165,6 +166,10 @@ impl FileSystem {
                 None
             }
         })
+    }
+
+    pub fn get_diagnostic<'a>() -> DiskAction<'a, Option<DiskDiagnostics>> {
+        DiskDiagnostics::get_diagnostics()
     }
 }
 
