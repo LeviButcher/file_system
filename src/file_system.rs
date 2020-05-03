@@ -19,13 +19,7 @@ pub fn write_inode_and_blocks<'a>(
     let write_inode = Inode::write_inode(i);
     let write_blocks = blocks.into_iter().map(|b| Block::write_block(b)).collect();
     let write_blocks = sequence(write_blocks);
-    let write_blocks = map(
-        write_blocks,
-        Box::new(|w| {
-            println!("{:?}", w);
-            utils::remove_options(w)
-        }),
-    );
+    let write_blocks = map(write_blocks, Box::new(|w| utils::remove_options(w)));
 
     map2(
         write_inode,
@@ -34,23 +28,29 @@ pub fn write_inode_and_blocks<'a>(
     )
 }
 
+pub fn get_file_inode_and_blocks<'a>(
+    file_name: String,
+) -> DiskAction<'a, Option<(Inode, Vec<Block>)>> {
+    let d = Directory::get_directory();
+    let d = map(
+        d,
+        utils::lift(Box::new(move |dir: Directory| dir.find(&file_name[..]))),
+    );
+    let d = map(d, Box::new(&|x: Option<Option<u32>>| x.flatten()));
+    let d = flat_map(d, utils::lift_disk_action(Box::new(Inode::get_inode)));
+    let d = flatten_option(d);
+    let d = flat_map(
+        d,
+        utils::lift_disk_action(Box::new(Inode::get_inode_blocks)),
+    );
+    flatten_option(d)
+}
+
 struct FileSystem {}
 impl FileSystem {
     pub fn read_file<'a>(file_name: String) -> DiskAction<'a, Option<String>> {
-        let d = Directory::get_directory();
-        let d = map(
-            d,
-            utils::lift(Box::new(move |dir: Directory| dir.find(&file_name[..]))),
-        );
-        let d = map(d, Box::new(&|x: Option<Option<u32>>| x.flatten()));
-        let d = flat_map(d, utils::lift_disk_action(Box::new(Inode::get_inode)));
-        let d = map(d, Box::new(|a| a.flatten()));
-        let d = flat_map(
-            d,
-            utils::lift_disk_action(Box::new(Inode::get_inode_blocks)),
-        );
-        let d = map(d, Box::new(|a| a.flatten()));
-        map(d, utils::lift(Box::new(Block::blocks_to_data)))
+        let d = get_file_inode_and_blocks(file_name);
+        map(d, utils::lift(Box::new(|(_, b)| Block::blocks_to_data(b))))
     }
 
     pub fn save_as_file<'a>(file_name: String, data: String) -> DiskAction<'a, Option<u32>> {
@@ -63,7 +63,7 @@ impl FileSystem {
         ); // Set Data On Free Blocks
         let d = map2(d, data_block, Box::new(Inode::set_inode_blocks)); // Combine inode and data_blocks and set them up
         let d = flat_map(d, utils::lift_disk_action(Box::new(write_inode_and_blocks))); // Write out the inode and data blocks
-        let d = map(d, Box::new(|x| x.flatten()));
+        let d = flatten_option(d);
         flat_map(
             d,
             Box::new(move |a| match a {
@@ -89,14 +89,24 @@ impl FileSystem {
     }
 
     pub fn remove_file<'a>(file_name: String) -> DiskAction<'a, bool> {
-        unit(false)
+        if file_name == "/" || file_name == "." {
+            return unit(false);
+        }
+
+        let write_inode_and_blocks = get_file_inode_and_blocks(file_name.clone());
+        let write_inode_and_blocks = flat_map(
+            write_inode_and_blocks,
+            utils::lift_disk_action(Box::new(|(i, b)| {
+                let free_inode = Inode::free_inode(i);
+                let free_blocks = Block::free_blocks(b);
+                map2(free_inode, free_blocks, Box::new(|a, b| (a, b)))
+            })),
+        );
+        let write_directory = Directory::remove_file_name(file_name.clone());
+        let d = map2(write_inode_and_blocks, write_directory, Box::new(|_, b| b));
+        map(d, Box::new(|x| x.is_some()))
     }
 
-    // Format the given disk
-    // write blocks to file
-    // write Superblock
-    // write inodes
-    // write directory
     pub fn format<'a>(file_name: String, size: u32) -> bool {
         let disk = Disk::new(&file_name);
         let super_block = SuperBlock::new(size);
@@ -135,8 +145,19 @@ impl FileSystem {
     }
 
     // Check that superblock is valid, if so return disk
-    pub fn mount<'a>(file_name: String) -> Option<Disk<'a>> {
-        None
+    // POTENTIAL PROBLEM, file_name needs to last as long as disk, so
+    // in the shell it may be a issue if the users command is dropped
+    // I hope not :/
+    pub fn mount<'a>(file_name: &'a str) -> Option<Disk<'a>> {
+        let disk = Disk::new(&file_name);
+        let (res, disk) = SuperBlock::get_super_block()(disk);
+        res.and_then(|s| {
+            if s.valid_super_block() {
+                Some(disk)
+            } else {
+                None
+            }
+        })
     }
 }
 
@@ -190,5 +211,32 @@ mod tests {
         let disk = Disk::new(&file);
         let (sb, _) = SuperBlock::get_super_block()(disk);
         assert_eq!(sb.unwrap().total_blocks, blocks);
+    }
+
+    #[test]
+    fn mount_should_mount_successfully() {
+        let res = FileSystem::mount("./test-files/sda1".into());
+        assert!(res.is_some());
+    }
+
+    #[test]
+    fn mount_should_mount_unsuccessfully() {
+        let res = FileSystem::mount("./test-files/line_handler_test_file.txt".into());
+        assert!(res.is_none());
+    }
+
+    #[test]
+    fn remove_file_should_return_expected() {
+        use std::fs;
+
+        let file_data = fs::read_to_string("./test-files/sda1").unwrap_or("".into());
+        fs::write("./test-files/remove_file_test", file_data).unwrap();
+        let disk = Disk::new("./test-files/remove_file_test");
+
+        let (result, disk) = FileSystem::remove_file("secret.txt".into())(disk);
+        assert_eq!(result, true);
+
+        let (data, _) = FileSystem::read_file("secret.txt".into())(disk);
+        assert_eq!(data, None);
     }
 }

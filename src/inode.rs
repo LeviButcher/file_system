@@ -78,7 +78,7 @@ impl Inode {
     }
 
     // Given a Inode, return all link list of blocks
-    pub fn get_inode_blocks<'a>(i: Inode) -> DiskAction<'a, Option<Vec<Block>>> {
+    pub fn get_inode_blocks<'a>(i: Inode) -> DiskAction<'a, Option<(Inode, Vec<Block>)>> {
         // This could be improved with unfold, :/
         // Or maybe map2?
         Box::new(move |mut disk| {
@@ -101,7 +101,7 @@ impl Inode {
                 disk = disk2;
                 blocks
             });
-            (blocks, disk)
+            (blocks.map(|b| (i, b)), disk)
         })
     }
 
@@ -228,6 +228,11 @@ impl Inode {
         );
         map(d, Box::new(|x| x.flatten()))
     }
+
+    pub fn free_inode<'a>(mut i: Inode) -> DiskAction<'a, Option<Inode>> {
+        i.start_block = None;
+        Inode::write_inode(i)
+    }
 }
 
 #[cfg(test)]
@@ -288,7 +293,7 @@ mod tests {
             start_block: Some(4),
         };
         let (data, disk) = Inode::get_inode_blocks(inode)(disk);
-        assert_eq!(data, Some(expected_data));
+        assert_eq!(data, Some((inode, expected_data)));
         assert_eq!(disk.reads, 4);
     }
 

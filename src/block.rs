@@ -98,9 +98,24 @@ impl Block {
         let d = map(d, utils::lift(Box::new(|x| serde_json::from_str(&x).ok())));
         map(d, Box::new(|x| x.flatten()))
     }
+
+    pub fn free_blocks<'a>(b: Vec<Block>) -> DiskAction<'a, Vec<Block>> {
+        let d = b
+            .into_iter()
+            .map(|x| x.free())
+            .map(|x| Block::write_block(x))
+            .collect();
+        let d = sequence(d);
+
+        map(d, Box::new(utils::remove_options))
+    }
 }
 
 impl SuperBlock {
+    pub fn valid_super_block(&self) -> bool {
+        self.magic_number == MAGIC_NUMBER
+    }
+
     // Return the super_block for a disk
     pub fn get_super_block<'a>() -> DiskAction<'a, Option<SuperBlock>> {
         let d = Block::get_block(1);

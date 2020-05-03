@@ -35,7 +35,7 @@ impl Directory {
             utils::lift_disk_action(Box::new(inode::Inode::get_inode_blocks)),
         );
         let d = flatten_option(d);
-        let d = map(d, utils::lift(Box::new(Block::blocks_to_data)));
+        let d = map(d, utils::lift(Box::new(|(_, b)| Block::blocks_to_data(b))));
         let d = map(d, utils::lift(Box::new(Directory::parse_directory)));
         flatten_option(d)
     }
@@ -47,8 +47,6 @@ impl Directory {
         inode_number: u32,
         file_name: String,
     ) -> DiskAction<'a, Option<u32>> {
-        println!("START SAVE DIRECTORY inode:{}", inode_number);
-
         let d = Directory::get_directory();
         let d = map(
             d,
@@ -65,6 +63,27 @@ impl Directory {
             utils::lift_disk_action(Box::new(Directory::save_directory)),
         );
         map(d, utils::lift(Box::new(move |_| inode_number)))
+    }
+
+    // prevent root directory from being remove
+    pub fn remove_file_name<'a>(file_name: String) -> DiskAction<'a, Option<bool>> {
+        // make sure it's not root directory
+        let d = Directory::get_directory();
+        let d = map(
+            d,
+            utils::lift(Box::new(move |mut x: Directory| {
+                x.directory.remove(&file_name);
+                x
+            })),
+        );
+        let wipe = Directory::wipe_directory_blocks();
+        let d = map2(d, wipe, Box::new(|a, _| a));
+
+        let d = flat_map(
+            d,
+            utils::lift_disk_action(Box::new(Directory::save_directory)),
+        );
+        map(d, utils::lift(Box::new(move |_| true)))
     }
 
     pub fn save_directory<'a>(d: Directory) -> DiskAction<'a, Option<Directory>> {
@@ -97,18 +116,10 @@ impl Directory {
         );
         let d = flatten_option(d);
         // Change all blocks to free, and save them
-        let d = flat_map(
+        flat_map(
             d,
-            utils::lift_disk_action(Box::new(|blocks| {
-                let blocks = blocks
-                    .into_iter()
-                    .map(|x| x.free())
-                    .map(|x| Block::write_block(x))
-                    .collect();
-                sequence(blocks)
-            })),
-        );
-        map(d, utils::lift(Box::new(utils::remove_options)))
+            utils::lift_disk_action(Box::new(|(_, b)| Block::free_blocks(b))),
+        )
     }
 }
 
