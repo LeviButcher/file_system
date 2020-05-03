@@ -1,4 +1,7 @@
-mod disk_emulator;
+mod block;
+mod directory;
+mod disk;
 mod file_system;
-mod shell;
+mod inode;
+mod line_handler;
 mod utils;

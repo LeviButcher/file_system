@@ -1,35 +1,50 @@
-use std::fs::File;
+use crate::disk::*;
 
-pub struct Disk {
-    file: File,
-    blocks: u32,
-    reads: f32,
-    writes: f32,
-    mounted: bool,
-}
-pub enum InodeType {
-    Free, File, Directory, SymLink
+static MAX_DATA_SIZE: u32 = 50;
+
+pub fn lift<'a, A: 'a, B: 'a>(f: Box<dyn Fn(A) -> B>) -> Box<dyn Fn(Option<A>) -> Option<B> + 'a> {
+    Box::new(move |x| match x {
+        Some(a) => Some(f(a)),
+        _ => None,
+    })
 }
 
-pub struct Inode {
-    number: u32,
-    type: InodeType,
-    startBlock: u32
-    size: u32,
-    // Change to time datatype
-    cTime: u32,
-
-
+pub fn lift_disk_action<'a, A: 'a, B: 'a>(
+    f: Box<dyn Fn(A) -> DiskAction<'a, B>>,
+) -> Box<dyn Fn(Option<A>) -> DiskAction<'a, Option<B>> + 'a> {
+    Box::new(move |a: Option<A>| match a {
+        Some(b) => map(f(b), Box::new(|c| Some(c))),
+        None => Box::new(|disk| (None, disk)),
+    })
 }
-pub struct Block {}
-pub struct SuperBlock {}
 
-pub struct SuperBlock {
-    // should always equal = 0x70736575646F4653
-    magicNumber: u32,
-    // Number of lines in system
-    totalBlocks: u32,
-    freeBlocks: Vec<u32>,
-    totalInodes: u32,
-    freeInodes: Vec<u32>,
+pub fn remove_options<A>(b: Vec<Option<A>>) -> Vec<A> {
+    b.into_iter()
+        .fold(Vec::<A>::new(), |mut acc, curr| match curr {
+            Some(a) => {
+                acc.push(a);
+                acc
+            }
+            None => acc,
+        })
+}
+
+pub fn string_to_block_data_chunks(s: String) -> Vec<String> {
+    let s = s.chars().collect::<Vec<char>>();
+    s.chunks(MAX_DATA_SIZE as usize)
+        .map(|chunk| chunk.iter().collect())
+        .collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn string_to_block_data_chunks_return_expected() {
+        let r = string_to_block_data_chunks(
+            " This is my stirn go fahst ea;lsf jasjfadklsjfal;sdfjads f".into(),
+        );
+        assert_eq!(r.len(), 2);
+    }
 }
