@@ -9,7 +9,7 @@
 mod block;
 mod diagnostics;
 mod directory;
-mod disk;
+pub mod disk;
 mod inode;
 mod line_handler;
 mod utils;
@@ -17,7 +17,7 @@ mod utils;
 use block::*;
 use diagnostics::*;
 use directory::*;
-use disk::*;
+pub use disk::*;
 use inode::*;
 
 pub fn write_inode_and_blocks<'a>(
