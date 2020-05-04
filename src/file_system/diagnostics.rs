@@ -24,7 +24,6 @@ impl DiskDiagnostics {
 
         Box::new(move |disk| {
             let (t, disk2) = d(disk);
-            println!("{:?}", t);
             let (sb, blocks, inodes) = t;
             let res = sb.map(|x| DiskDiagnostics {
                 valid_magic_number: x.valid_super_block(),
