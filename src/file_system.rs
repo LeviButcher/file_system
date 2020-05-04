@@ -54,7 +54,8 @@ pub fn get_file_inode_and_blocks<'a>(
     flatten_option(d)
 }
 
-struct FileSystem {}
+#[derive(Debug)]
+pub struct FileSystem {}
 impl FileSystem {
     pub fn read_file<'a>(file_name: String) -> DiskAction<'a, Option<String>> {
         let d = get_file_inode_and_blocks(file_name);
